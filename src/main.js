@@ -107,7 +107,8 @@ function floorView(key, floor) {
   const target = b.center.clone().setY(b.floors.get(floor).e);
   const out = new THREE.Vector3(b.center.x - 5, 0, b.center.z - 5).normalize();
   if (key === 'A') out.set(-0.2, 0, 1).normalize();
-  return { pos: target.clone().add(out.multiplyScalar(46)).add(new THREE.Vector3(0, 68, 0)), target };
+  const k = innerWidth < innerHeight ? 1.6 : 1; // portrait phones
+  return { pos: target.clone().add(out.multiplyScalar(46 * k)).add(new THREE.Vector3(0, 68 * k, 0)), target };
 }
 
 // ---------- highlight ----------
