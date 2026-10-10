@@ -3,12 +3,15 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { BLOCKS, FIRST_APARTMENT_FLOOR, AREA_PER_FLOOR } from './config.js';
 import { buildSite } from './site.js';
-import { buildPodium } from './podium.js';
+import { buildPodium, podiumOutline } from './podium.js';
 import { buildBlock } from './tower.js';
 import * as T from './textures.js';
 import { STR, LANGS } from './i18n.js';
 import planRects from './plan-rects.json';
-import { buildPhotoView, VIEWS } from './photos.js';
+import cameras from './cameras.json';
+import { VIEWS, H as PHOTO_H } from './photos.js';
+import { createProjector } from './projection.js';
+import { StreetControls, pointInPolygon } from './street.js';
 
 const $ = (s) => document.querySelector(s);
 
@@ -27,7 +30,8 @@ const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 scene.environmentIntensity = 0.55;
 
-const camera = new THREE.PerspectiveCamera(36, innerWidth / innerHeight, 0.5, 5000);
+const ORBIT_FOV = 36;
+const camera = new THREE.PerspectiveCamera(ORBIT_FOV, innerWidth / innerHeight, 0.5, 5000);
 const HOME = { pos: new THREE.Vector3(205, 92, 160), target: new THREE.Vector3(12, 30, 2) };
 // portrait phone screens need the camera further back to fit the complex
 const homePos = () => HOME.target.clone().add(HOME.pos.clone().sub(HOME.target).multiplyScalar(innerWidth < innerHeight ? 1.75 : 1));
@@ -70,8 +74,14 @@ const M = {
   playYellow: std({ color: 0xf3c63d, roughness: 0.7 }),
 };
 
+// The client's renders become the skin of the buildings
+const projector = createProjector(VIEWS, cameras);
+for (const k of ['brick', 'glass', 'glassLight', 'store', 'copper', 'white', 'roof', 'fins', 'dark', 'stone']) projector.patch(M[k]);
+
 // ---------- scene ----------
+const before = scene.children.length;
 buildSite(scene);
+const siteObjects = scene.children.slice(before);
 const podium = buildPodium(M);
 scene.add(podium);
 
@@ -87,6 +97,22 @@ for (const b of Object.values(BLOCKS)) {
 }
 const pickables = Object.values(blocks).flatMap((b) => b.pickables);
 
+// what each render's camera can see (balcony glass and the surroundings don't block)
+const railMeshes = [];
+scene.traverse((o) => o.isMesh && o.material === M.rail && railMeshes.push(o));
+projector.bakeDepth(renderer, scene, [...siteObjects, ...railMeshes]);
+
+// ---------- street walking ----------
+const podiumFoot = podiumOutline(1.2);
+const towerFeet = Object.values(blocks).map((b) => b.slabPts);
+function isBlocked(x, z) {
+  if (Math.abs(x) > 450 || Math.abs(z) > 450) return true;
+  if (x > 134 && x < 196 && (z < 101 || z > 123)) return true; // river, except the bridge
+  if (pointInPolygon(x, z, podiumFoot)) return true;
+  return towerFeet.some((pts) => pointInPolygon(x, z, pts));
+}
+const street = new StreetControls(camera, canvas, isBlocked);
+
 // ---------- state ----------
 let lang = 'ru';
 try {
@@ -94,13 +120,13 @@ try {
   if (LANGS.includes(saved)) lang = saved;
 } catch {}
 const S = () => STR[lang];
-const state = { view: 'photo', mode: 'overview', block: 'V', floor: null, hover: null };
+const state = { nav: 'orbit', view: 'overview', mode: 'overview', block: 'V', floor: null, hover: null };
 let lastInteraction = performance.now();
 
 // ---------- camera ----------
 let tween = null;
-function flyTo(pos, target, dur = 1.2) {
-  tween = { p0: camera.position.clone(), t0: controls.target.clone(), p1: pos.clone(), t1: target.clone(), t: 0, dur };
+function flyTo(pos, target, dur = 1.2, fov = ORBIT_FOV) {
+  tween = { p0: camera.position.clone(), t0: controls.target.clone(), p1: pos.clone(), t1: target.clone(), f0: camera.fov, f1: fov, t: 0, dur };
   controls.enabled = false;
 }
 function floorView(key, floor) {
@@ -110,6 +136,16 @@ function floorView(key, floor) {
   if (key === 'A') out.set(-0.2, 0, 1).normalize();
   const k = innerWidth < innerHeight ? 1.6 : 1; // portrait phones
   return { pos: target.clone().add(out.multiplyScalar(46 * k)).add(new THREE.Vector3(0, 68 * k, 0)), target };
+}
+// Stand exactly where the render was taken from
+function renderView(id) {
+  const c = cameras[id];
+  const pos = new THREE.Vector3(...c.pos);
+  const fwd = new THREE.Vector3(Math.sin(c.yaw), 0, -Math.cos(c.yaw));
+  const up = Math.tan(Math.atan((c.v0 - PHOTO_H / 2) / c.f)); // the renders use a shifted lens
+  const target = pos.clone().add(fwd.multiplyScalar(120)).add(new THREE.Vector3(0, 120 * up, 0));
+  const fov = THREE.MathUtils.radToDeg(2 * Math.atan(PHOTO_H / 2 / c.f));
+  return { pos, target, fov };
 }
 
 // ---------- highlight ----------
@@ -124,7 +160,6 @@ function updateHighlight() {
       m.material.opacity = 0.45;
     }
   }
-  photo.highlight(state.hover);
   document.querySelectorAll('.floor-btn').forEach((el) => {
     el.classList.toggle('hover', !!state.hover && state.hover.block === state.block && +el.dataset.floor === state.hover.floor);
   });
@@ -183,14 +218,18 @@ function renderSide() {
       </div>
       <p class="note">${isHotel ? s.hotelNote : s.planNote}</p>`;
   }
-  $('#hint').textContent = state.view === 'photo' ? s.hintPhoto : state.mode === 'overview' ? s.hintOverview : s.hintFloor;
+  $('#hint').textContent = state.mode === 'overview' ? s.hintOverview : s.hintFloor;
 }
 
 function renderViews() {
   const s = S();
+  const on = (v) => (state.view === v ? 'on' : '');
   $('#views').innerHTML =
-    VIEWS.map((v) => `<button class="thumb ${state.view === 'photo' && photo.view === v.id ? 'on' : ''}" data-photo="${v.id}" style="background-image:url(${v.src})" aria-label="${v.id}"></button>`).join('') +
-    `<button class="thumb three ${state.view === '3d' ? 'on' : ''}" data-photo="3d">${s.view3d}</button>`;
+    `<button class="thumb text ${on('overview')}" data-view="overview">${s.overview}</button>` +
+    VIEWS.map((v, i) => `<button class="thumb ${on(v.id)}" data-view="${v.id}" style="background-image:url(${v.src})" aria-label="${s.viewpoint(i + 1)}" title="${s.viewpoint(i + 1)}"></button>`).join('') +
+    `<button class="thumb text ${on('street')}" data-view="street">${s.walk}</button>`;
+  $('#exit-street').textContent = s.exitWalk;
+  $('#street-help').textContent = s.streetHelp;
 }
 
 function refresh() {
@@ -208,7 +247,7 @@ $('#lang').addEventListener('click', (e) => {
   try {
     localStorage.setItem('simsim-lang', lang);
   } catch {}
-  document.documentElement.lang = lang === 'tg' ? 'tg' : lang;
+  document.documentElement.lang = lang;
   refresh();
 });
 $('#floors').addEventListener('click', (e) => {
@@ -218,10 +257,7 @@ $('#floors').addEventListener('click', (e) => {
   else if (b.dataset.block) {
     state.block = b.dataset.block;
     renderFloors();
-  } else if (b.dataset.floor) {
-    setView('3d');
-    selectFloor(state.block, +b.dataset.floor);
-  }
+  } else if (b.dataset.floor) selectFloor(state.block, +b.dataset.floor);
 });
 $('#floors').addEventListener('pointerover', (e) => {
   const b = e.target.closest('.floor-btn');
@@ -235,42 +271,87 @@ $('#floors').addEventListener('pointerleave', () => {
 $('#side').addEventListener('click', (e) => {
   if (e.target.closest('[data-act="overview"]')) goOverview();
 });
-addEventListener('keydown', (e) => {
-  if (e.code === 'Escape' && state.mode === 'floor') goOverview();
-});
-
-function setView(v) {
-  state.view = v;
-  $('#photo').hidden = v !== 'photo';
-  $('#side').hidden = v === 'photo';
-  canvas.style.visibility = v === 'photo' ? 'hidden' : 'visible';
-  tooltip.style.opacity = 0;
-}
 $('#views').addEventListener('click', (e) => {
   const b = e.target.closest('button');
   if (!b) return;
-  if (b.dataset.photo === '3d') {
-    setView('3d');
-  } else {
-    photo.show(b.dataset.photo);
-    goOverview(true);
-  }
-  refresh();
+  const v = b.dataset.view;
+  if (v === 'overview') goOverview();
+  else if (v === 'street') enterStreet();
+  else goRender(v);
+});
+$('#exit-street').addEventListener('click', () => goOverview());
+addEventListener('keydown', (e) => {
+  if (e.code !== 'Escape') return;
+  if (state.nav === 'street' || state.mode === 'floor') goOverview();
 });
 
+function clearCutaway() {
+  for (const b of Object.values(blocks)) b.cutaway(null);
+  Object.assign(state, { mode: 'overview', floor: null });
+}
+
+function leaveStreet() {
+  if (state.nav !== 'street') return;
+  street.stop();
+  state.nav = 'orbit';
+  controls.enabled = true;
+  document.body.classList.remove('street');
+  $('#street-ui').hidden = true;
+  camera.near = 0.5;
+  camera.updateProjectionMatrix();
+}
+
 function selectFloor(key, floor) {
+  leaveStreet();
   for (const b of Object.values(blocks)) b.cutaway(b.block.key === key ? floor : null);
-  Object.assign(state, { mode: 'floor', block: key, floor });
+  Object.assign(state, { mode: 'floor', block: key, floor, view: null });
   const v = floorView(key, floor);
   flyTo(v.pos, v.target);
   refresh();
 }
 
-function goOverview(toPhotos = true) {
-  for (const b of Object.values(blocks)) b.cutaway(null);
-  Object.assign(state, { mode: 'overview', floor: null });
-  if (toPhotos) setView('photo');
+function goOverview() {
+  leaveStreet();
+  clearCutaway();
+  state.view = 'overview';
+  history.replaceState(null, '', location.pathname);
   flyTo(homePos(), HOME.target, 1.4);
+  refresh();
+}
+
+function goRender(id, instant = false) {
+  leaveStreet();
+  clearCutaway();
+  state.view = id;
+  const v = renderView(id);
+  if (instant) {
+    tween = null;
+    camera.position.copy(v.pos);
+    controls.target.copy(v.target);
+    camera.fov = v.fov;
+    camera.updateProjectionMatrix();
+    camera.lookAt(v.target);
+  } else flyTo(v.pos, v.target, 1.6, v.fov);
+  history.replaceState(null, '', `#${id}`);
+  refresh();
+}
+
+function enterStreet() {
+  clearCutaway();
+  tween = null;
+  state.nav = 'street';
+  state.view = 'street';
+  controls.enabled = false;
+  controls.autoRotate = false;
+  document.body.classList.add('street');
+  $('#street-ui').hidden = false;
+  tooltip.style.opacity = 0;
+  camera.fov = 62;
+  camera.near = 0.2;
+  camera.updateProjectionMatrix();
+  // start on the avenue pavement, facing the shopping centre
+  street.start(88, 10.5, Math.PI / 2 - 0.15, 0.22);
+  history.replaceState(null, '', '#street');
   refresh();
 }
 
@@ -295,9 +376,10 @@ let down = null;
 canvas.addEventListener('pointerdown', (e) => {
   down = { x: e.clientX, y: e.clientY };
   lastInteraction = performance.now();
+  if (e.pointerType === 'touch') document.body.classList.add('touch');
 });
 canvas.addEventListener('pointermove', (e) => {
-  if (e.buttons || e.pointerType === 'touch') {
+  if (state.nav === 'street' || e.buttons || e.pointerType === 'touch') {
     tooltip.style.opacity = 0;
     return;
   }
@@ -322,7 +404,7 @@ canvas.addEventListener('pointerleave', () => {
   updateHighlight();
 });
 canvas.addEventListener('pointerup', (e) => {
-  if (!down) return;
+  if (!down || state.nav === 'street') return;
   const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6;
   down = null;
   if (moved) return;
@@ -334,6 +416,35 @@ canvas.addEventListener('pointerup', (e) => {
 });
 addEventListener('wheel', () => (lastInteraction = performance.now()), { passive: true });
 
+// on-screen joystick for touch screens
+const joy = $('#joystick'), knob = joy.querySelector('.knob');
+let joyId = null;
+const joyMove = (e) => {
+  const r = joy.getBoundingClientRect();
+  let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+  const max = r.width / 2 - 10, d = Math.hypot(dx, dy);
+  if (d > max) {
+    dx *= max / d;
+    dy *= max / d;
+  }
+  knob.style.transform = `translate(${dx}px, ${dy}px)`;
+  street.joy.x = dx / max;
+  street.joy.y = dy / max;
+};
+joy.addEventListener('pointerdown', (e) => {
+  joyId = e.pointerId;
+  joy.setPointerCapture(joyId);
+  joyMove(e);
+});
+joy.addEventListener('pointermove', (e) => e.pointerId === joyId && joyMove(e));
+const joyEnd = () => {
+  joyId = null;
+  knob.style.transform = '';
+  street.joy.x = street.joy.y = 0;
+};
+joy.addEventListener('pointerup', joyEnd);
+joy.addEventListener('pointercancel', joyEnd);
+
 // ---------- loop ----------
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
@@ -344,43 +455,49 @@ const clock = new THREE.Clock();
 const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.05);
-  if (state.view === 'photo') return; // nothing to draw behind the photo
-  if (tween) {
+  if (state.nav === 'street') {
+    street.update(dt);
+  } else if (state.nav === 'debug') {
+    // camera fixed by __sim.lookThrough
+  } else if (tween) {
     tween.t += dt;
     const k = ease(Math.min(1, tween.t / tween.dur));
     camera.position.lerpVectors(tween.p0, tween.p1, k);
     controls.target.lerpVectors(tween.t0, tween.t1, k);
+    camera.fov = THREE.MathUtils.lerp(tween.f0, tween.f1, k);
+    camera.updateProjectionMatrix();
     camera.lookAt(controls.target);
     if (k >= 1) {
       tween = null;
       controls.enabled = true;
     }
   } else {
-    controls.autoRotate = state.mode === 'overview' && performance.now() - lastInteraction > 25000;
+    controls.autoRotate = state.mode === 'overview' && state.view === 'overview' && performance.now() - lastInteraction > 25000;
     controls.update();
   }
   renderer.render(scene, camera);
 });
 
-// ---------- photo view ----------
-const photo = buildPhotoView($('#photo'), {
-  onHover(h, e) {
-    state.hover = h;
-    updateHighlight();
-    if (h && e) {
-      const s = S();
-      tooltip.innerHTML = `<b>${s.blocks[h.block]}</b><br>${s.floor(h.floor)} · ${h.block === 'A' ? s.hotel : s.residential}`;
-      tooltip.style.left = `${e.clientX + 16}px`;
-      tooltip.style.top = `${e.clientY + 12}px`;
-      tooltip.style.opacity = 1;
-    } else tooltip.style.opacity = 0;
-  },
-  onPick(h) {
-    state.block = h.block;
-    setView('3d');
-    selectFloor(h.block, h.floor);
-  },
-});
-photo.show(VIEWS[0].id);
-setView('photo');
+// ?debug: look through a render's exact camera to check the projection lines up
+if (location.search.includes('debug')) {
+  window.__sim = {
+    lookThrough(id) {
+      const cam = projector.items.find((i) => i.id === id).cam;
+      controls.enabled = false;
+      state.nav = 'debug';
+      camera.position.copy(cam.position);
+      camera.quaternion.copy(cam.quaternion);
+      camera.projectionMatrix.copy(cam.projectionMatrix);
+      camera.projectionMatrixInverse.copy(cam.projectionMatrixInverse);
+      camera.updateProjectionMatrix = () => {};
+    },
+    strength(v) {
+      projector.uniforms.photoStrength.value = v;
+    },
+  };
+}
 refresh();
+// links straight to a viewpoint: #v2, #v4, #v10, #v11 or #street
+const start = location.hash.slice(1);
+if (cameras[start]) goRender(start, true);
+else if (start === 'street') enterStreet();

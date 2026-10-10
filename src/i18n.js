@@ -3,8 +3,11 @@ export const LANGS = ['ru', 'tg', 'en'];
 
 export const STR = {
   ru: {
-    view3d: '3D модель',
-    hintPhoto: 'Наведите на этаж и нажмите, чтобы открыть план',
+    overview: 'Обзор',
+    walk: 'Прогулка',
+    viewpoint: (n) => `Ракурс ${n}`,
+    exitWalk: '✕ Выйти из прогулки',
+    streetHelp: 'Перетаскивайте, чтобы осмотреться · W A S D или стрелки — идти · Shift — быстрее',
     langName: 'РУС',
     brandSub: 'Шаҳрофар · Душанбе, пр. С. Шерози',
     complex: 'Весь комплекс',
@@ -38,8 +41,11 @@ export const STR = {
     apartmentsFrom: 'с',
   },
   tg: {
-    view3d: 'Модели 3D',
-    hintPhoto: 'Ба ошёна нишон диҳед ва пахш кунед, то тарҳи он кушода шавад',
+    overview: 'Намуди умумӣ',
+    walk: 'Сайругашт',
+    viewpoint: (n) => `Нуқтаи назар ${n}`,
+    exitWalk: '✕ Анҷоми сайругашт',
+    streetHelp: 'Барои дидан кашед · W A S D ё тирчаҳо — рафтан · Shift — тезтар',
     langName: 'ТОҶ',
     brandSub: 'Шаҳрофар · Душанбе, хиёбони С. Шерозӣ',
     complex: 'Тамоми маҷмаа',
@@ -73,8 +79,11 @@ export const STR = {
     apartmentsFrom: 'аз',
   },
   en: {
-    view3d: '3D model',
-    hintPhoto: 'Point at a floor and click it to open its plan',
+    overview: 'Overview',
+    walk: 'Street walk',
+    viewpoint: (n) => `View ${n}`,
+    exitWalk: '✕ Exit street walk',
+    streetHelp: 'Drag to look around · W A S D or arrows to walk · Shift to go faster',
     langName: 'ENG',
     brandSub: 'Shahrofar · Dushanbe, S. Sherozi Ave.',
     complex: 'Whole complex',

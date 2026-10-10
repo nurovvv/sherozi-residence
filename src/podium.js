@@ -32,6 +32,11 @@ function facadeSegs(pts, outerCount) {
   return segs;
 }
 
+/** Footprint of the shopping centre, grown by d meters (used to keep walkers out). */
+export function podiumOutline(d = 0) {
+  return outline({ rOut: PODIUM.rOut, rIn: PODIUM.rIn, arcEnd: PODIUM.arcEndDeg, top: PODIUM.wingTopZ, d });
+}
+
 export function buildPodium(M) {
   const root = new THREE.Group();
   const P = PODIUM;

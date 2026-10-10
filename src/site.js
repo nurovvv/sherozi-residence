@@ -141,7 +141,11 @@ export function buildSite(scene) {
 
   // trees: avenue rows, park behind the courtyard, lawns in front
   const spots = [];
-  for (let z = -380; z < 380; z += 11) spots.push([AX - 20, z], [AX + 20, z]);
+  for (let z = -380; z < 380; z += 11) {
+    // leave the pavement in front of the shopping centre open (its facade already shows the renders' trees)
+    if (z < -90 || z > 90) spots.push([AX - 20, z]);
+    spots.push([AX + 20, z]);
+  }
   for (let x = -140; x < 60; x += 12) spots.push([x, 126], [x + 6, 98]);
   while (spots.length < 420) {
     const x = -260 + rnd() * 300, z = -320 + rnd() * 330;

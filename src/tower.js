@@ -139,6 +139,7 @@ export function buildBlock(block, M, plan) {
     center: new THREE.Vector3(cx, 0, cz),
     roofY,
     pickables: [...floors.values()].map((f) => f.overlay),
+    slabPts,
     // Hide everything above `floor` and lay the drawing on that floor.
     cutaway(floor) {
       for (const [f, fl] of floors) {
