@@ -8,6 +8,7 @@ import { buildBlock } from './tower.js';
 import * as T from './textures.js';
 import { STR, LANGS } from './i18n.js';
 import planRects from './plan-rects.json';
+import { buildPhotoView, VIEWS } from './photos.js';
 
 const $ = (s) => document.querySelector(s);
 
@@ -93,7 +94,7 @@ try {
   if (LANGS.includes(saved)) lang = saved;
 } catch {}
 const S = () => STR[lang];
-const state = { mode: 'overview', block: 'V', floor: null, hover: null };
+const state = { view: 'photo', mode: 'overview', block: 'V', floor: null, hover: null };
 let lastInteraction = performance.now();
 
 // ---------- camera ----------
@@ -123,6 +124,7 @@ function updateHighlight() {
       m.material.opacity = 0.45;
     }
   }
+  photo.highlight(state.hover);
   document.querySelectorAll('.floor-btn').forEach((el) => {
     el.classList.toggle('hover', !!state.hover && state.hover.block === state.block && +el.dataset.floor === state.hover.floor);
   });
@@ -181,11 +183,19 @@ function renderSide() {
       </div>
       <p class="note">${isHotel ? s.hotelNote : s.planNote}</p>`;
   }
-  $('#hint').textContent = state.mode === 'overview' ? s.hintOverview : s.hintFloor;
+  $('#hint').textContent = state.view === 'photo' ? s.hintPhoto : state.mode === 'overview' ? s.hintOverview : s.hintFloor;
+}
+
+function renderViews() {
+  const s = S();
+  $('#views').innerHTML =
+    VIEWS.map((v) => `<button class="thumb ${state.view === 'photo' && photo.view === v.id ? 'on' : ''}" data-photo="${v.id}" style="background-image:url(${v.src})" aria-label="${v.id}"></button>`).join('') +
+    `<button class="thumb three ${state.view === '3d' ? 'on' : ''}" data-photo="3d">${s.view3d}</button>`;
 }
 
 function refresh() {
   renderLang();
+  renderViews();
   renderFloors();
   renderSide();
   updateHighlight();
@@ -208,7 +218,10 @@ $('#floors').addEventListener('click', (e) => {
   else if (b.dataset.block) {
     state.block = b.dataset.block;
     renderFloors();
-  } else if (b.dataset.floor) selectFloor(state.block, +b.dataset.floor);
+  } else if (b.dataset.floor) {
+    setView('3d');
+    selectFloor(state.block, +b.dataset.floor);
+  }
 });
 $('#floors').addEventListener('pointerover', (e) => {
   const b = e.target.closest('.floor-btn');
@@ -226,6 +239,25 @@ addEventListener('keydown', (e) => {
   if (e.code === 'Escape' && state.mode === 'floor') goOverview();
 });
 
+function setView(v) {
+  state.view = v;
+  $('#photo').hidden = v !== 'photo';
+  $('#side').hidden = v === 'photo';
+  canvas.style.visibility = v === 'photo' ? 'hidden' : 'visible';
+  tooltip.style.opacity = 0;
+}
+$('#views').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  if (b.dataset.photo === '3d') {
+    setView('3d');
+  } else {
+    photo.show(b.dataset.photo);
+    goOverview(true);
+  }
+  refresh();
+});
+
 function selectFloor(key, floor) {
   for (const b of Object.values(blocks)) b.cutaway(b.block.key === key ? floor : null);
   Object.assign(state, { mode: 'floor', block: key, floor });
@@ -234,9 +266,10 @@ function selectFloor(key, floor) {
   refresh();
 }
 
-function goOverview() {
+function goOverview(toPhotos = true) {
   for (const b of Object.values(blocks)) b.cutaway(null);
   Object.assign(state, { mode: 'overview', floor: null });
+  if (toPhotos) setView('photo');
   flyTo(homePos(), HOME.target, 1.4);
   refresh();
 }
@@ -311,6 +344,7 @@ const clock = new THREE.Clock();
 const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.05);
+  if (state.view === 'photo') return; // nothing to draw behind the photo
   if (tween) {
     tween.t += dt;
     const k = ease(Math.min(1, tween.t / tween.dur));
@@ -328,4 +362,25 @@ renderer.setAnimationLoop(() => {
   renderer.render(scene, camera);
 });
 
+// ---------- photo view ----------
+const photo = buildPhotoView($('#photo'), {
+  onHover(h, e) {
+    state.hover = h;
+    updateHighlight();
+    if (h && e) {
+      const s = S();
+      tooltip.innerHTML = `<b>${s.blocks[h.block]}</b><br>${s.floor(h.floor)} · ${h.block === 'A' ? s.hotel : s.residential}`;
+      tooltip.style.left = `${e.clientX + 16}px`;
+      tooltip.style.top = `${e.clientY + 12}px`;
+      tooltip.style.opacity = 1;
+    } else tooltip.style.opacity = 0;
+  },
+  onPick(h) {
+    state.block = h.block;
+    setView('3d');
+    selectFloor(h.block, h.floor);
+  },
+});
+photo.show(VIEWS[0].id);
+setView('photo');
 refresh();

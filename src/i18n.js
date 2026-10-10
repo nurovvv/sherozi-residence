@@ -3,6 +3,8 @@ export const LANGS = ['ru', 'tg', 'en'];
 
 export const STR = {
   ru: {
+    view3d: '3D модель',
+    hintPhoto: 'Наведите на этаж и нажмите, чтобы открыть план',
     langName: 'РУС',
     brandSub: 'Шаҳрофар · Душанбе, пр. С. Шерози',
     complex: 'Весь комплекс',
@@ -36,6 +38,8 @@ export const STR = {
     apartmentsFrom: 'с',
   },
   tg: {
+    view3d: 'Модели 3D',
+    hintPhoto: 'Ба ошёна нишон диҳед ва пахш кунед, то тарҳи он кушода шавад',
     langName: 'ТОҶ',
     brandSub: 'Шаҳрофар · Душанбе, хиёбони С. Шерозӣ',
     complex: 'Тамоми маҷмаа',
@@ -69,6 +73,8 @@ export const STR = {
     apartmentsFrom: 'аз',
   },
   en: {
+    view3d: '3D model',
+    hintPhoto: 'Point at a floor and click it to open its plan',
     langName: 'ENG',
     brandSub: 'Shahrofar · Dushanbe, S. Sherozi Ave.',
     complex: 'Whole complex',
