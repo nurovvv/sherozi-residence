@@ -1,4 +1,4 @@
-// "Сим-Сим" complex (Шаҳрофар), S. Sherozi ave., Dushanbe.
+// Sherozi Residence complex (Шаҳрофар), S. Sherozi ave., Dushanbe.
 // All positions come from the architectural drawings (sheet АР-7, typical floor plan).
 // World units are meters. X/Z follow the drawing sheet (X → right, Z → down the sheet), Y is up.
 

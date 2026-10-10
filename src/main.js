@@ -28,7 +28,9 @@ scene.environmentIntensity = 0.55;
 
 const camera = new THREE.PerspectiveCamera(36, innerWidth / innerHeight, 0.5, 5000);
 const HOME = { pos: new THREE.Vector3(205, 92, 160), target: new THREE.Vector3(12, 30, 2) };
-camera.position.copy(HOME.pos);
+// portrait phone screens need the camera further back to fit the complex
+const homePos = () => HOME.target.clone().add(HOME.pos.clone().sub(HOME.target).multiplyScalar(innerWidth < innerHeight ? 1.75 : 1));
+camera.position.copy(homePos());
 const controls = new OrbitControls(camera, canvas);
 controls.target.copy(HOME.target);
 controls.enableDamping = true;
@@ -234,7 +236,7 @@ function selectFloor(key, floor) {
 function goOverview() {
   for (const b of Object.values(blocks)) b.cutaway(null);
   Object.assign(state, { mode: 'overview', floor: null });
-  flyTo(HOME.pos, HOME.target, 1.4);
+  flyTo(homePos(), HOME.target, 1.4);
   refresh();
 }
 

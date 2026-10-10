@@ -76,8 +76,15 @@ button:focus-visible { outline: 2px solid var(--brick); outline-offset: 2px; }
 #tooltip b { font-size: 13px; }
 
 @media (max-width: 760px) {
-  .brand-sub { display: none; }
-  #floors { top: auto; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); left: 16px; right: 16px; width: auto; max-height: 34%; }
-  #side { top: calc(72px + env(safe-area-inset-top, 0px)); left: 16px; right: 16px; width: auto; max-height: 36%; padding: 14px; }
-  #hint { display: none; }
+  .logo, .brand-sub, .facts, #hint, .label { display: none; }
+  .brand { padding: 9px 12px; max-width: calc(100% - 210px); }
+  .brand-name { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #side { top: calc(68px + env(safe-area-inset-top, 0px)); left: 16px; right: 16px; width: auto; max-height: 34%; padding: 12px 14px; }
+  #side h2 { font-size: 18px; }
+  .sub { margin: 0; }
+  .note { margin-top: 8px; padding: 8px 10px; }
+  #floors { top: auto; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); left: 16px; right: 16px; width: auto; padding: 8px; gap: 6px; }
+  .floor-list { flex-direction: row; overflow-x: auto; overflow-y: hidden; padding-bottom: 2px; }
+  .floor-btn { grid-template-columns: 1fr; min-width: 46px; padding: 6px 4px; }
+  .floor-btn .meta { display: none; }
 }

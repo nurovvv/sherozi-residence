@@ -14,7 +14,7 @@ export const STR = {
     hotel: 'Гостиница',
     residential: 'Жилой дом',
     mall: 'Торговый центр',
-    title: 'Комплекс «Сим-Сим»',
+    title: 'Sherozi Residence',
     sub: 'Гостиница, два жилых дома и торговый центр с террасой на крыше',
     facts: [
       ['А-16', 'гостиница, 16 этажей'],
@@ -47,7 +47,7 @@ export const STR = {
     hotel: 'Меҳмонхона',
     residential: 'Бинои истиқоматӣ',
     mall: 'Маркази савдо',
-    title: 'Маҷмааи «Сим-Сим»',
+    title: 'Sherozi Residence',
     sub: 'Меҳмонхона, ду бинои истиқоматӣ ва маркази савдо бо терраса дар бом',
     facts: [
       ['А-16', 'меҳмонхона, 16 ошёна'],
@@ -80,7 +80,7 @@ export const STR = {
     hotel: 'Hotel',
     residential: 'Residential',
     mall: 'Shopping centre',
-    title: 'Sim-Sim complex',
+    title: 'Sherozi Residence',
     sub: 'A hotel, two residential towers and a shopping centre with a roof terrace',
     facts: [
       ['A-16', 'hotel, 16 floors'],

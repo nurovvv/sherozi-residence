@@ -1,6 +1,6 @@
-# Сим-Сим – interactive 3D model
+# Sherozi Residence – interactive 3D model
 
-3D model of the "Сим-Сим" complex (Шаҳрофар, S. Sherozi Ave., Dushanbe): hotel А-16, residential blocks Б-20 and В-24, and the curved shopping centre with its roof terrace. Pick a floor on the model or in the list to see that floor's plan.
+3D model of the Sherozi Residence complex (Шаҳрофар, S. Sherozi Ave., Dushanbe): hotel А-16, residential blocks Б-20 and В-24, and the curved shopping centre with its roof terrace. Pick a floor on the model or in the list to see that floor's plan.
 
 Built with [Three.js](https://threejs.org) and [Vite](https://vitejs.dev). Block positions and floor levels come from the architectural drawings; see `src/config.js`.
 
